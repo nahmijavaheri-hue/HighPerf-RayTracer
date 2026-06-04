@@ -11,12 +11,14 @@ class Sphere : public Hittable {
 public:
     Point3 center;
     double radius;
+    Material *mat;
 
-    Sphere(Point3 center, double radius) : center(center), radius(radius) {
+    Sphere(Point3 center, double radius, Material *mat) : center(center), radius(radius), mat(mat) {
     }
 
     bool hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const override {
         Vec3 oc = r.origin - center;
+        rec.material = mat;
         double a = r.dir.dot(r.dir);
         double b = 2.0 * oc.dot(r.dir);
         double c = oc.dot(oc) - radius * radius;

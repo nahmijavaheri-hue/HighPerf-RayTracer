@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <random>
 
 // ── Vec3 ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,8 @@ struct Vec3 {
     double lengthSq() const { return dot(*this); }
     double length() const { return std::sqrt(lengthSq()); }
     Vec3 normalized() const { return *this / length(); }
+
+    Vec3 &operator+=(const Vec3 &v) { x+=v.x; y+=v.y; z+=v.z; return *this; }
 };
 
 using Point3 = Vec3;
@@ -46,6 +49,13 @@ inline void writeColor(std::ostream &out, Color c) {
     out << static_cast<int>(255.99 * c.x) << ' '
             << static_cast<int>(255.99 * c.y) << ' '
             << static_cast<int>(255.99 * c.z) << '\n';
+}
+
+inline double generateRandomOffset() {
+    std::random_device rd;
+    std::mt19937_64  engine(rd());
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    return distribution(engine);
 }
 
 #endif // HIGHPERF_RAYTRACER_MAIN_H
