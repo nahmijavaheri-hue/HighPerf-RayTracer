@@ -3,14 +3,17 @@
 #include <fstream>
 #include <limits>
 
+#include "dielectric.h"
 #include "hittable_list.h"
 #include "lambertian.h"
 #include "metal.h"
+#include "plane.h"
 #include "sphere.h"
 
 const double infinity = std::numeric_limits<double>::infinity();
 
 Color rayColor(const Ray &r, const Hittable &scene, double maxBounces) {
+    if (maxBounces <= 0) return {0, 0, 0};
     HitRecord rec;
     if (scene.hit(r, 0.001, infinity, rec)) {
         Ray scattered;
@@ -30,14 +33,15 @@ Color rayColor(const Ray &r, const Hittable &scene, double maxBounces) {
 int main() {
     // Image
     const double aspectRatio = 16.0 / 9.0;
-    const int imageWidth = 800;
+    const int imageWidth = 1600;
     const int imageHeight = static_cast<int>(imageWidth / aspectRatio);
 
     // Scene
     HittableList scene;
-    scene.add(new Sphere({1, 0, -1}, 0.5, new Lambertian({0.5,0.5,0.5}))); // center sphere
+    scene.add(new Sphere({1, 0, -1}, 0.5, new Lambertian({0.5,0.5,0.5})));
     scene.add(new Sphere({0, 0, -1}, 0.5, new Metal({0.5,0.5,0.5}, 0.0))); // center sphere
-    scene.add(new Sphere({0, -100.5, -1}, 100, new Lambertian({0.8, 0.8, 0.0}))); // ground
+    scene.add(new Sphere({-1, 0, -1}, 0.5, new Dielectric(1.5)));
+    scene.add(new Plane({0, -0.5, 0}, {0, 1, 0}, new Lambertian({0.8, 0.8, 0.0}))); // ground
 
     // Camera
     double viewportHeight = 2.0;
@@ -57,7 +61,7 @@ int main() {
     for (int j = imageHeight - 1; j >= 0; --j) {
         std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
         for (int i = 0; i < imageWidth; ++i) {
-            double numSamplesPerPixel = 1;
+            double numSamplesPerPixel = 150;
             Color pixel = {0, 0, 0};
             for (int s = 0; s < numSamplesPerPixel; ++s) {
                 double u = (static_cast<double>(i) + generateRandomOffset()) / (imageWidth - 1);
