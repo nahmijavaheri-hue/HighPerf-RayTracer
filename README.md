@@ -10,7 +10,7 @@ A physically-based ray tracer written from scratch in C++, with no external rend
 
 ![Current Render](render.png)
 
-Three spheres on an infinite plane: a diffuse Lambertian on the left, a perfect mirror metal in the center, and a glass dielectric on the right — rendered with a blue-white sky gradient background.
+Three spheres on an infinite plane: a diffuse Lambertian on the right, a perfect mirror metal in the center, and a glass dielectric on the left — rendered with a blue-white sky gradient background.
 
 ---
 
