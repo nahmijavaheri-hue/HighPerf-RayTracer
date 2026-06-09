@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "material.h"
+#include "aabb.h"
 
 struct HitRecord {
     Point3 point; // Point at which hit occurred
@@ -18,6 +19,7 @@ struct HitRecord {
 class Hittable {
 public:
     virtual bool hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const = 0;
+    virtual AABB boundingBox() const = 0;
 
     virtual ~Hittable() = default;
 };

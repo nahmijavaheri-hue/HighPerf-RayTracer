@@ -16,6 +16,13 @@ public:
     Sphere(Point3 center, double radius, Material *mat) : center(center), radius(radius), mat(mat) {
     }
 
+    AABB boundingBox() const override {
+        return AABB{
+            center - Vec3{radius, radius, radius},
+            center + Vec3{radius, radius, radius}
+        };
+    }
+
     bool hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const override {
         Vec3 oc = r.origin - center;
         rec.material = mat;
