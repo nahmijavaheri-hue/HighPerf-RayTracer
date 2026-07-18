@@ -18,17 +18,43 @@ public:
     AABB box;
 
     BVHNode(std::vector<Hittable *> &objects, int start, int end) {
-        // 1. pick a random axis to sort along
-        // 2. sort objects in [start, end) by their bounding box center on that axis
-        // 3. if one object:  assign to both left and right
-        //    if two objects: assign one to left, one to right
-        //    else:           split in half, recurse into left and right
-        // 4. compute this node's bounding box from left and right
+        int axis = static_cast<int>(3 * generateRandomOffset());
+
+        auto center = [axis](const Hittable *h) {
+            AABB b = h->boundingBox();
+            return axis == 0 ? b.min.x + b.max.x : axis == 1 ? b.min.y + b.max.y : b.min.z + b.max.z;
+        };
+        auto comparator = [&center](const Hittable *a, const Hittable *b) { return center(a) < center(b); };
+
+        int span = end - start;
+
+        if (span == 1) {
+            left = right = objects[start];
+        } else if (span == 2) {
+            if (comparator(objects[start], objects[start + 1])) {
+                left = objects[start];
+                right = objects[start + 1];
+            } else {
+                left = objects[start + 1];
+                right = objects[start];
+            }
+        } else {
+            std::sort(objects.begin() + start, objects.begin() + end, comparator);
+            int mid = start + span / 2;
+            left = new BVHNode(objects, start, mid);
+            right = new BVHNode(objects, mid, end);
+        }
+
+        box = surroundingBox(left->boundingBox(), right->boundingBox());
     }
 
     bool hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const override {
-        // 1. test ray against this node's bounding box — if miss, return false
-        // 2. recurse into left and right, keeping the closest hit
+        if (!box.hit(r, tMin, tMax)) return false;
+
+        bool hitLeft = left->hit(r, tMin, tMax, rec);
+        bool hitRight = right->hit(r, tMin, hitLeft ? rec.t : tMax, rec);
+
+        return hitLeft || hitRight;
     }
 
     AABB boundingBox() const override {

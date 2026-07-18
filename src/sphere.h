@@ -25,7 +25,6 @@ public:
 
     bool hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const override {
         Vec3 oc = r.origin - center;
-        rec.material = mat;
         double a = r.dir.dot(r.dir);
         double b = 2.0 * oc.dot(r.dir);
         double c = oc.dot(oc) - radius * radius;
@@ -41,6 +40,7 @@ public:
         rec.t = t;
         rec.point = r.at(t);
         rec.normal = (rec.point - center) / radius;
+        rec.material = mat;
         return true;
     }
 };

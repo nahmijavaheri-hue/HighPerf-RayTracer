@@ -8,9 +8,11 @@ A physically-based ray tracer written from scratch in C++, with no external rend
 
 > 1600×900 — 150 samples per pixel — 50 max bounces
 
-![Current Render](render.png)
+![Current Render](renders/2026-06-09_materials-and-anti-aliasing.png)
 
 Three spheres on an infinite plane: a diffuse Lambertian on the right, a perfect mirror metal in the center, and a glass dielectric on the left — rendered with a blue-white sky gradient background.
+
+*(Rendering now goes through BVH traversal under the hood — the showcase render here will be refreshed once multithreading makes a full-quality pass fast enough to iterate on.)*
 
 ---
 
@@ -25,7 +27,7 @@ src/
 ├── hittable.h        — Hittable base class + HitRecord
 ├── hittable_list.h   — scene container + surroundingBox()
 ├── aabb.h            — axis-aligned bounding box (slab method)
-├── bvh.h             — BVH node (in progress)
+├── bvh.h             — BVH node (construction + traversal)
 ├── sphere.h          — sphere primitive
 ├── plane.h           — infinite plane primitive
 ├── material.h        — Material base class
@@ -55,24 +57,14 @@ src/
 
 ### Acceleration
 - **AABB** — axis-aligned bounding box with slab-method ray intersection
-- **BVH scaffolding** — `BVHNode` class inheriting from `Hittable`, structure in place for recursive tree traversal
-
----
-
-## In Progress
-
-### BVH Construction & Traversal
-The `BVHNode` constructor and `hit()` method are stubbed out and ready to implement. The strategy:
-- **Longest-axis split** — at each node, sort objects along whichever axis (X/Y/Z) has the widest spatial spread, then split at the midpoint
-- **Recursive build** — left and right subtrees built recursively until leaf nodes hold single objects
-- Expected result: ray intersection drops from **O(n)** to **O(log n)**
+- **BVH** — `BVHNode` recursively splits objects along a random axis at each node, sorted by bounding-box center, down to leaf nodes; `hit()` culls whole subtrees via the node's box before recursing — ray intersection drops from **O(n)** to **O(log n)**
 
 ---
 
 ## Roadmap
 
 ### Short Term
-- [ ] Complete BVH constructor and `hit()` traversal
+- [x] Complete BVH constructor and `hit()` traversal
 - [ ] Gamma correction (currently linear output)
 - [ ] Moveable / configurable camera (FOV, look-at, aperture)
 - [ ] Depth of field / defocus blur
