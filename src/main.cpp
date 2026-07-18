@@ -2,7 +2,9 @@
 
 #include <fstream>
 #include <limits>
+#include <chrono>
 
+#include "bvh.h"
 #include "dielectric.h"
 #include "hittable_list.h"
 #include "lambertian.h"
@@ -43,6 +45,8 @@ int main() {
     scene.add(new Sphere({-1, 0, -1}, 0.5, new Dielectric(1.5)));
     scene.add(new Plane({0, -0.5, 0}, {0, 1, 0}, new Lambertian({0.8, 0.8, 0.0}))); // ground
 
+    BVHNode bvh(scene.objects, 0, static_cast<int>(scene.objects.size()));
+
     // Camera
     double viewportHeight = 2.0;
     double viewportWidth = aspectRatio * viewportHeight;
@@ -57,21 +61,24 @@ int main() {
 
     std::ofstream out("image.ppm");
     out << "P3\n" << imageWidth << ' ' << imageHeight << "\n255\n";
-
+    auto start = std::chrono::high_resolution_clock::now();
     for (int j = imageHeight - 1; j >= 0; --j) {
         std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
         for (int i = 0; i < imageWidth; ++i) {
-            double numSamplesPerPixel = 150;
+            double numSamplesPerPixel = 15;
             Color pixel = {0, 0, 0};
             for (int s = 0; s < numSamplesPerPixel; ++s) {
                 double u = (static_cast<double>(i) + generateRandomOffset()) / (imageWidth - 1);
                 double v = (static_cast<double>(j) + generateRandomOffset()) / (imageHeight - 1);
                 Ray r{origin, (lowerLeft + horizontal * u + vertical * v - origin).normalized()};
-                pixel = pixel + rayColor(r, scene, 50);
+                pixel = pixel + rayColor(r, bvh, 50);
             }
             writeColor(out, pixel / numSamplesPerPixel);
         }
     }
-    std::cerr << "\nDone. Saved to image.ppm\n";
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> elapsed = end - start;
+    std::cerr << "\nDone. Render took " << elapsed.count() << " milliseconds.\n";
+    std::cerr << "\nSaved to image.ppm\n";
     return 0;
 };
