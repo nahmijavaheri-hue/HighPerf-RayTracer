@@ -17,22 +17,30 @@
 
 const double infinity = std::numeric_limits<double>::infinity();
 
-Color rayColor(const Ray &r, const Hittable &scene, double maxBounces) {
-    if (maxBounces <= 0) return {0, 0, 0};
-    HitRecord rec;
-    if (scene.hit(r, 0.001, infinity, rec)) {
+Color rayColor(Ray r, const Hittable &scene, int maxBounces) {
+    Color throughput = {1, 1, 1};
+
+    for (int depth = 0; depth < maxBounces; ++depth) {
+        HitRecord rec;
+        if (!scene.hit(r, 0.001, infinity, rec)) {
+            // background: vertical blue-white gradient
+            Vec3 unit = r.dir.normalized();
+            double blend = 0.5 * (unit.y + 1.0);
+            Color background = Vec3{1, 1, 1} * (1.0 - blend) + Vec3{0.5, 0.7, 1.0} * blend;
+            return throughput * background;
+        }
+
         Ray scattered;
         Color attenuation;
-        // map normal [-1,1] -> [0,1] for visualization
-        if (rec.material->scatter(r, rec, attenuation, scattered)) {
-            return attenuation * rayColor(scattered, scene, maxBounces - 1);
+        if (!rec.material->scatter(r, rec, attenuation, scattered)) {
+            return throughput;
         }
-        return {1,1,1};
+
+        throughput = throughput * attenuation;
+        r = scattered;
     }
-    // background: vertical blue-white gradient
-    Vec3 unit = r.dir.normalized();
-    double blend = 0.5 * (unit.y + 1.0);
-    return Vec3{1, 1, 1} * (1.0 - blend) + Vec3{0.5, 0.7, 1.0} * blend;
+
+    return {0, 0, 0};
 }
 
 class SceneWithGround : public Hittable {
