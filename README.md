@@ -49,6 +49,20 @@ Same scene, same 1600×900 / 150 samples-per-pixel / 50-bounce settings, same ma
 
 ---
 
+## Live Preview GUI
+
+A settings window pops up on launch — pick a resolution (presets or custom width/height/aspect ratio), anti-aliasing quality, exact samples-per-pixel, and bounce depth, then hit Render:
+
+![Settings window](screenshots/settings-window.png)
+
+The preview window opens blank and fills in tile by tile as the render runs, each tile itself de-noising sample by sample rather than popping in fully-formed. The bar underneath tracks live progress and elapsed time, ending in a "Done!" message once the file's actually saved:
+
+![Live render demo](screenshots/live-render-demo.gif)
+
+Built on raw Win32 (no GUI framework) — a `PreviewWindow` (a DIB section blitted via `WM_TIMER`) and a `SettingsWindow` (plain `COMBOBOX`/`EDIT`/`BUTTON` controls) running under one shared message loop. Render button re-enables automatically once a render finishes, so you can change settings and render again without restarting the app.
+
+---
+
 ## Architecture
 
 The renderer is structured around a clean virtual `Hittable` interface. Every object in the scene exposes two methods — `hit()` for ray intersection and `boundingBox()` for BVH traversal — making it trivial to add new primitives.
