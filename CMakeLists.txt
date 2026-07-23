@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 include_directories(.)
 
-add_executable(HighPerf_RayTracer
+add_executable(HighPerf_RayTracer WIN32
         src/main.cpp
         src/main.h
         src/hittable.h
@@ -17,4 +17,7 @@ add_executable(HighPerf_RayTracer
         src/dielectric.h
         src/aabb.h
         src/bvh.h
-        src/plane.h)
+        src/plane.h
+        src/window.h)
+
+target_link_libraries(HighPerf_RayTracer gdi32 user32)
