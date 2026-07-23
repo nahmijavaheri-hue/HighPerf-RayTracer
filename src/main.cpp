@@ -1,8 +1,11 @@
 #include "main.h"
 
+#include <atomic>
 #include <fstream>
 #include <limits>
 #include <chrono>
+#include <mutex>
+#include <thread>
 
 #include "bvh.h"
 #include "dielectric.h"
@@ -30,6 +33,30 @@ Color rayColor(const Ray &r, const Hittable &scene, double maxBounces) {
     Vec3 unit = r.dir.normalized();
     double blend = 0.5 * (unit.y + 1.0);
     return Vec3{1, 1, 1} * (1.0 - blend) + Vec3{0.5, 0.7, 1.0} * blend;
+}
+
+struct Tile {
+    int xStart, xEnd; // [xStart, xEnd)
+    int yStart, yEnd; // [yStart, yEnd)
+};
+
+void renderTile(const Tile &tile, int imageWidth, int imageHeight,
+                 const Point3 &origin, const Vec3 &lowerLeft,
+                 const Vec3 &horizontal, const Vec3 &vertical,
+                 const Hittable &scene, int maxBounces, int numSamplesPerPixel,
+                 std::vector<Color> &framebuffer) {
+    for (int row = tile.yStart; row < tile.yEnd; ++row) {
+        for (int col = tile.xStart; col < tile.xEnd; ++col) {
+            Color pixel = {0, 0, 0};
+            for (int s = 0; s < numSamplesPerPixel; ++s) {
+                const double u = (static_cast<double>(col) + generateRandomOffset()) / (imageWidth - 1);
+                const double v = (static_cast<double>(row) + generateRandomOffset()) / (imageHeight - 1);
+                Ray r{origin, (lowerLeft + horizontal * u + vertical * v - origin).normalized()};
+                pixel = pixel + rayColor(r, scene, maxBounces);
+            }
+            framebuffer[row * imageWidth + col] = pixel / numSamplesPerPixel;
+        }
+    }
 }
 
 int main() {
@@ -60,22 +87,63 @@ int main() {
     // Render
 
     std::ofstream out("image.ppm");
+    std::vector<Color> framebuffer(imageWidth * imageHeight);
     out << "P3\n" << imageWidth << ' ' << imageHeight << "\n255\n";
     auto start = std::chrono::high_resolution_clock::now();
-    for (int j = imageHeight - 1; j >= 0; --j) {
-        std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
-        for (int i = 0; i < imageWidth; ++i) {
-            double numSamplesPerPixel = 15;
-            Color pixel = {0, 0, 0};
-            for (int s = 0; s < numSamplesPerPixel; ++s) {
-                double u = (static_cast<double>(i) + generateRandomOffset()) / (imageWidth - 1);
-                double v = (static_cast<double>(j) + generateRandomOffset()) / (imageHeight - 1);
-                Ray r{origin, (lowerLeft + horizontal * u + vertical * v - origin).normalized()};
-                pixel = pixel + rayColor(r, bvh, 50);
-            }
-            writeColor(out, pixel / numSamplesPerPixel);
+
+    int tileSize = 32;
+    std::vector<Tile> tiles;
+    for (int row = 0; row < imageHeight; row += tileSize) {
+        for (int col = 0; col < imageWidth; col += tileSize) {
+            Tile tile;
+            tile.xStart = col;
+            tile.xEnd = std::min(col + tileSize, imageWidth);
+            tile.yStart = row;
+            tile.yEnd = std::min(row + tileSize, imageHeight);
+            tiles.push_back(tile);
+
         }
     }
+
+    std::atomic<size_t> nextTile{0};
+    std::atomic<size_t> tilesCompleted{0};
+    std::mutex printMutex;
+    double numSamplesPerPixel = 100;
+    double maxBounces = 10;
+    unsigned numThreads = std::thread::hardware_concurrency();
+    if (numThreads == 0) numThreads = 4;
+    auto worker = [&]() {
+        while (true) {
+            size_t index = nextTile.fetch_add(1);
+            if (index >= tiles.size()) break;
+            renderTile(tiles[index], imageWidth, imageHeight, origin, lowerLeft,
+                horizontal, vertical, bvh, maxBounces, numSamplesPerPixel, framebuffer);
+
+            size_t done = ++tilesCompleted;
+            std::lock_guard<std::mutex> lock(printMutex);
+
+            const int barWidth = 40;
+            const double fraction = static_cast<double>(done) / static_cast<double>(tiles.size());
+            const int filled = static_cast<int>(fraction * barWidth);
+            const int percent = static_cast<int>(fraction * 100);
+
+            std::cerr << "\r[";
+            for (int i = 0; i < barWidth; ++i) std::cerr << (i < filled ? '#' : '-');
+            std::cerr << "] " << percent << "%  " << done << " / " << tiles.size()
+                       << " tiles completed   " << std::flush;
+        }
+    };
+
+    std::vector<std::thread> workers;
+    for (unsigned i = 0; i < numThreads; ++i) {workers.emplace_back(worker);}
+    for (auto& worker : workers) {worker.join();}
+
+    for (int row = imageHeight - 1; row >= 0; --row) {
+        for (int col = 0; col < imageWidth; ++col) {
+            writeColor(out, framebuffer[row * imageWidth + col]);
+        }
+    }
+
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> elapsed = end - start;
     std::cerr << "\nDone. Render took " << elapsed.count() << " milliseconds.\n";

@@ -52,8 +52,7 @@ inline void writeColor(std::ostream &out, Color c) {
 }
 
 inline double generateRandomOffset() {
-    std::random_device rd;
-    std::mt19937_64  engine(rd());
+    thread_local std::mt19937_64 engine(std::random_device{}());
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
     return distribution(engine);
 }
