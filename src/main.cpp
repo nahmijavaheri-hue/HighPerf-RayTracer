@@ -35,6 +35,25 @@ Color rayColor(const Ray &r, const Hittable &scene, double maxBounces) {
     return Vec3{1, 1, 1} * (1.0 - blend) + Vec3{0.5, 0.7, 1.0} * blend;
 }
 
+class SceneWithGround : public Hittable {
+public:
+    const Hittable &bvh;
+    const Hittable &groundPlane;
+
+    SceneWithGround(const Hittable &bvh, const Hittable &groundPlane)
+        : bvh(bvh), groundPlane(groundPlane) {}
+
+    bool hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const override {
+        bool hitBvh = bvh.hit(r, tMin, tMax, rec);
+        bool hitGround = groundPlane.hit(r, tMin, hitBvh ? rec.t : tMax, rec);
+        return hitBvh || hitGround;
+    }
+
+    AABB boundingBox() const override {
+        return bvh.boundingBox(); // never queried at the top level, just satisfies the interface
+    }
+};
+
 struct Tile {
     int xStart, xEnd; // [xStart, xEnd)
     int yStart, yEnd; // [yStart, yEnd)
@@ -70,9 +89,12 @@ int main() {
     scene.add(new Sphere({1, 0, -1}, 0.5, new Lambertian({0.5,0.5,0.5})));
     scene.add(new Sphere({0, 0, -1}, 0.5, new Metal({0.5,0.5,0.5}, 0.0))); // center sphere
     scene.add(new Sphere({-1, 0, -1}, 0.5, new Dielectric(1.5)));
-    scene.add(new Plane({0, -0.5, 0}, {0, 1, 0}, new Lambertian({0.8, 0.8, 0.0}))); // ground
+    // ground plane is kept out of the BVH — its AABB is effectively infinite (see plane.h),
+    // which would make the tree's box tests useless as culling. Tested separately instead.
 
     BVHNode bvh(scene.objects, 0, static_cast<int>(scene.objects.size()));
+    Plane groundPlane({0, -0.5, 0}, {0, 1, 0}, new Lambertian({0.8, 0.8, 0.0}));
+    SceneWithGround world(bvh, groundPlane);
 
     // Camera
     double viewportHeight = 2.0;
@@ -117,7 +139,7 @@ int main() {
             size_t index = nextTile.fetch_add(1);
             if (index >= tiles.size()) break;
             renderTile(tiles[index], imageWidth, imageHeight, origin, lowerLeft,
-                horizontal, vertical, bvh, maxBounces, numSamplesPerPixel, framebuffer);
+                horizontal, vertical, world, maxBounces, numSamplesPerPixel, framebuffer);
 
             size_t done = ++tilesCompleted;
             std::lock_guard<std::mutex> lock(printMutex);

@@ -6,14 +6,19 @@ A physically-based ray tracer written from scratch in C++, with no external rend
 
 ## Current Render
 
-> 1600×900 — 150 samples per pixel — 50 max bounces — BVH-accelerated, tile-based multithreaded
+> 1600×900 — 150 samples per pixel — 50 max bounces — BVH-accelerated, tile-based multithreaded, gamma-corrected
 
-![Current Render](renders/2026-07-23_bvh-multithreaded.png)
+![Current Render](renders/2026-07-23_gamma-and-plane-fix.png)
 
-Three spheres on an infinite plane: a diffuse Lambertian on the right, a perfect mirror metal in the center, and a glass dielectric on the left — rendered with a blue-white sky gradient background, now traced through a BVH and split across a thread pool instead of one scanline at a time.
+Three spheres on an infinite plane: a diffuse Lambertian on the right, a perfect mirror metal in the center, and a glass dielectric on the left — rendered with a blue-white sky gradient background. Gamma correction (`sqrt` before the 0-255 scale) brings out detail that used to get crushed toward black.
 
 <details>
 <summary>Previous renders</summary>
+
+#### BVH + Multithreading — 2026-07-23
+![BVH and multithreading phase](renders/2026-07-23_bvh-multithreaded.png)
+
+First render with the BVH actually wired in and tile-based multithreading, before gamma correction, before the ground plane was pulled out of the BVH, and before the `float` migration.
 
 #### Materials & Anti-Aliasing — 2026-06-09
 ![Materials and anti-aliasing phase](renders/2026-06-09_materials-and-anti-aliasing.png)
@@ -26,14 +31,15 @@ First render with all three material types (Lambertian, metal, dielectric) and m
 
 ## Performance
 
-Same scene, same 1600×900 / 150 samples-per-pixel / 50-bounce settings, same machine, same compiler flags (`-O2`) — the only thing that changed is the rendering approach:
+Same scene, same 1600×900 / 150 samples-per-pixel / 50-bounce settings, same machine, same compiler flags (`-O2`) — the only thing that changed each row is the rendering approach:
 
 | Version | Render time |
 |---|---|
 | Linear object scan, single-threaded (pre-BVH) | 19m 17.8s |
-| BVH + tile-based multithreading (current) | 5m 41.5s |
+| BVH + tile-based multithreading | 5m 41.5s |
+| + gamma correction, ground plane pulled out of the BVH, `float` instead of `double`, thread-local RNG | 47.7s |
 
-**~3.4x faster** — about a 70.5% cut in render time.
+**~24.3x faster than the original baseline** (~7.2x faster than the multithreading-only version above it) — about a 96% cut in render time overall. The ground plane's bounding box was effectively infinite, which was quietly defeating the BVH's ability to cull rays that never hit anything — pulling it out of the tree turned out to matter more than any other single change so far.
 
 ---
 
@@ -62,8 +68,8 @@ src/
 ## What's Implemented
 
 ### Core
-- **Vec3 / Ray / Color** — hand-rolled math with dot product, normalization, arithmetic operators
-- **PPM output** — renders directly to `.ppm` image files
+- **Vec3 / Ray / Color** — hand-rolled math with dot product, normalization, arithmetic operators, `float`-precision components
+- **PPM output** — renders directly to `.ppm` image files, with gamma correction (`sqrt`) applied before the 0-255 scale
 - **Recursive ray tracing** — up to N bounces with configurable depth
 - **Anti-aliasing** — multi-sample per pixel with random jitter
 
@@ -79,6 +85,7 @@ src/
 ### Acceleration
 - **AABB** — axis-aligned bounding box with slab-method ray intersection
 - **BVH** — `BVHNode` recursively splits objects along a random axis at each node, sorted by bounding-box center, down to leaf nodes; `hit()` culls whole subtrees via the node's box before recursing — ray intersection drops from **O(n)** to **O(log n)**
+- **Ground plane kept out of the BVH** — its bounding box is effectively infinite, so putting it in the tree made every node's box test overlap almost everything; `SceneWithGround` tests it separately and combines the result with the BVH's closest hit
 
 ### Performance
 - **Tile-based multithreading** — the image is split into 32×32 tiles pulled from a shared atomic counter, so worker threads (`std::thread::hardware_concurrency()` of them) grab the next tile as soon as they finish one instead of owning a fixed range up front — keeps threads busy even when some tiles (like the mirror/glass spheres) take far longer than others
@@ -90,7 +97,7 @@ src/
 
 ### Short Term
 - [x] Complete BVH constructor and `hit()` traversal
-- [ ] Gamma correction (currently linear output)
+- [x] Gamma correction (currently linear output)
 - [ ] Moveable / configurable camera (FOV, look-at, aperture)
 - [ ] Depth of field / defocus blur
 
